@@ -1,0 +1,82 @@
+{
+  "name": "poi-plugin-kc-equipment-export",
+  "version": "0.17.1",
+  "private": false,
+  "description": "Poi plugin for exporting KanColle ship and equipment inventory as CSV and normalized JSON",
+  "license": "MIT",
+  "author": {
+    "name": "白水",
+    "links": "https://github.com/lawvs"
+  },
+  "keywords": [
+    "poi",
+    "plugin",
+    "kancolle",
+    "ship",
+    "equipment",
+    "csv",
+    "json",
+    "inventory"
+  ],
+  "files": [
+    "src/App.tsx",
+    "src/export.ts",
+    "src/index.ts",
+    "src/poi/env.ts",
+    "src/poi/hooks.ts",
+    "src/poi/store.ts",
+    "src/poi/types.ts",
+    "src/Settings.tsx",
+    "i18n",
+    "package.json",
+    "README.md"
+  ],
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "npm run typeCheck",
+    "test": "jest",
+    "typeCheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@blueprintjs/core": "^5.7.2",
+    "@blueprintjs/icons": "^5.7.2",
+    "i18next": "^19.8.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-i18next": "^11.8.5",
+    "styled-components": "^6.1.13",
+    "stylis": "^4.3.4"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.12.10",
+    "@babel/preset-env": "^7.23.2",
+    "@babel/preset-react": "^7.22.15",
+    "@babel/preset-typescript": "^7.23.2",
+    "@types/jest": "^29.5.12",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.9.3"
+  },
+  "poiPlugin": {
+    "title": "KC Inventory Export",
+    "description": "Export current owned ship and equipment data from poi into CSV and normalized JSON files",
+    "icon": "fa/download",
+    "i18nDir": "./i18n",
+    "priority": 2,
+    "apiVer": {}
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kwt-klure/poi-plugin-kc-inventory-export.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kwt-klure/poi-plugin-kc-inventory-export/issues"
+  },
+  "homepage": "https://github.com/kwt-klure/poi-plugin-kc-inventory-export#readme",
+  "packageManager": "npm@11.6.0"
+}
