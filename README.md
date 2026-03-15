@@ -93,7 +93,7 @@ Install into Poi using its own plugin npm directory. Do not symlink plugin folde
 
 ```sh
 cd "/path/to/poi/plugins"
-npm install "/path/to/repo/dist/poi-plugin-kc-equipment-export-0.17.1.tgz"
+npm install "/path/to/repo/dist/poi-plugin-kc-equipment-export-0.17.2.tgz"
 ```
 
 To remove it:

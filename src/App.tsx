@@ -1,4 +1,11 @@
-import { Button, Callout, H4, OverlaysProvider, Text } from '@blueprintjs/core'
+import {
+  Button,
+  Callout,
+  Divider,
+  H4,
+  OverlaysProvider,
+  Text,
+} from '@blueprintjs/core'
 import { IconNames } from '@blueprintjs/icons'
 import React, { StrictMode, useCallback, useState } from 'react'
 import styled from 'styled-components'
@@ -14,45 +21,18 @@ import {
 import { IN_POI } from './poi/env'
 import { usePluginTranslation } from './poi/hooks'
 import { exportPoiState } from './poi/store'
-
-const Container = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100%;
-  padding: 24px;
-  background:
-    radial-gradient(circle at top, rgba(80, 168, 220, 0.18), transparent 45%),
-    linear-gradient(180deg, #f5fbff 0%, #e4eef7 100%);
-`
-
-const Panel = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: min(560px, 100%);
-  padding: 24px;
-  border: 1px solid rgba(22, 82, 123, 0.12);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 16px 40px rgba(25, 60, 91, 0.12);
-`
-
-const Header = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`
+import { usePoiTheme } from './poi/theme'
+import {
+  ActionsRow,
+  BodyText,
+  PageContent,
+  PageRoot,
+  SectionHeader,
+  SurfaceCard,
+} from './ui/chrome'
 
 const StatusText = styled(Text)`
   white-space: pre-wrap;
-`
-
-const ButtonRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
 `
 
 type FailureTranslationKey =
@@ -63,6 +43,7 @@ type FailureTranslationKey =
 
 const AppMain: React.FC = () => {
   const { t } = usePluginTranslation()
+  const { isDark, rootRef } = usePoiTheme<HTMLDivElement>()
   const [isExporting, setIsExporting] = useState(false)
   const [status, setStatus] = useState<{
     intent: 'success' | 'warning' | 'danger' | null
@@ -204,69 +185,81 @@ const AppMain: React.FC = () => {
   }, [setFailureStatus, t])
 
   return (
-    <Container>
-      <Panel>
-        <Header>
+    <PageRoot ref={rootRef}>
+      <PageContent>
+        <SurfaceCard $isDark={isDark} elevation={0}>
+          <SectionHeader>
           <H4>{t('KC Inventory Export')}</H4>
-          <Text>{t('Inventory export description')}</Text>
-        </Header>
+            <BodyText>{t('Inventory export description')}</BodyText>
+          </SectionHeader>
 
-        <Callout intent={IN_POI ? 'primary' : 'warning'} icon={IconNames.INFO_SIGN}>
-          {IN_POI ? t('Inventory export ready hint') : t('Poi environment required')}
-        </Callout>
-
-        <ButtonRow>
-          <Button
-            large
-            intent="primary"
-            icon={IconNames.EXPORT}
-            text={t('Export ship and equipment CSVs')}
-            loading={isExporting}
-            disabled={!IN_POI || isExporting}
-            onClick={handleInventoryExport}
-          />
-          <Button
-            large
-            icon={IconNames.SHIP}
-            text={t('Export ship CSV')}
-            loading={isExporting}
-            disabled={!IN_POI || isExporting}
-            onClick={handleShipExport}
-          />
-          <Button
-            large
-            icon={IconNames.CODE_BLOCK}
-            text={t('Export inventory JSON')}
-            loading={isExporting}
-            disabled={!IN_POI || isExporting}
-            onClick={handleInventoryJsonExport}
-          />
-          <Button
-            large
-            icon={IconNames.BOX}
-            text={t('Export equipment CSV')}
-            loading={isExporting}
-            disabled={!IN_POI || isExporting}
-            onClick={handleEquipmentExport}
-          />
-        </ButtonRow>
-
-        {status.message ? (
           <Callout
-            intent={status.intent ?? 'none'}
-            icon={
-              status.intent === 'success'
-                ? IconNames.TICK
-                : status.intent === 'warning'
-                  ? IconNames.WARNING_SIGN
-                  : IconNames.ERROR
-            }
+            intent={IN_POI ? 'primary' : 'warning'}
+            icon={IconNames.INFO_SIGN}
           >
-            <StatusText>{status.message}</StatusText>
+            {IN_POI
+              ? t('Inventory export ready hint')
+              : t('Poi environment required')}
           </Callout>
-        ) : null}
-      </Panel>
-    </Container>
+
+          <Divider />
+
+          <ActionsRow>
+            <Button
+              large
+              intent="primary"
+              icon={IconNames.EXPORT}
+              text={t('Export ship and equipment CSVs')}
+              loading={isExporting}
+              disabled={!IN_POI || isExporting}
+              onClick={handleInventoryExport}
+            />
+            <Button
+              large
+              icon={IconNames.SHIP}
+              text={t('Export ship CSV')}
+              loading={isExporting}
+              disabled={!IN_POI || isExporting}
+              onClick={handleShipExport}
+            />
+            <Button
+              large
+              icon={IconNames.CODE_BLOCK}
+              text={t('Export inventory JSON')}
+              loading={isExporting}
+              disabled={!IN_POI || isExporting}
+              onClick={handleInventoryJsonExport}
+            />
+            <Button
+              large
+              icon={IconNames.BOX}
+              text={t('Export equipment CSV')}
+              loading={isExporting}
+              disabled={!IN_POI || isExporting}
+              onClick={handleEquipmentExport}
+            />
+          </ActionsRow>
+
+          {status.message ? (
+            <>
+              <Divider />
+              <Callout
+                intent={status.intent ?? 'none'}
+                icon={
+                  status.intent === 'success'
+                    ? IconNames.TICK
+                    : status.intent === 'warning'
+                      ? IconNames.WARNING_SIGN
+                      : IconNames.ERROR
+                }
+              >
+                <StatusText>{status.message}</StatusText>
+              </Callout>
+            </>
+          ) : null}
+        </SurfaceCard>
+      </PageContent>
+    </PageRoot>
   )
 }
 
