@@ -1,12 +1,12 @@
 {
   "name": "poi-plugin-kc-equipment-export",
-  "version": "0.17.2",
+  "version": "0.1.3",
   "private": false,
   "description": "Poi plugin for exporting KanColle ship and equipment inventory as CSV and normalized JSON",
   "license": "MIT",
   "author": {
-    "name": "白水",
-    "links": "https://github.com/lawvs"
+    "name": "kwt-klure",
+    "links": "https://github.com/kwt-klure"
   },
   "keywords": [
     "poi",

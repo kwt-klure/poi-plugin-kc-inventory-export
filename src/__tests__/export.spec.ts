@@ -335,7 +335,7 @@ describe('buildInventoryJsonFromPoiState', () => {
     expect(snapshot.source).toEqual({
       package_name: 'poi-plugin-kc-equipment-export',
       plugin_title: 'KC Inventory Export',
-      plugin_version: '0.17.2',
+      plugin_version: '0.1.3',
       format: 'normalized_json',
     })
     expect(snapshot.fleets).toEqual([

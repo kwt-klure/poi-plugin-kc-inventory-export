@@ -1,27 +1,18 @@
-# poi-plugin-kc-equipment-export
+# KC Inventory Export
 
-`poi-plugin-kc-equipment-export` is a lightweight [poi](https://github.com/poooi/poi) plugin that exports your current KanColle ship and equipment inventory as CSV files or normalized JSON.
+`KC Inventory Export` is a standalone [Poi](https://github.com/poooi/poi) plugin for exporting your current KanColle inventory into machine-friendly files.
 
-The package name stays the same for compatibility, but the current plugin title in Poi is `KC Inventory Export`.
+For Poi compatibility, the npm package name remains `poi-plugin-kc-equipment-export`.
 
-## Overview
+## What it does
 
-This plugin replaces manual DevTools snippets with a Poi UI that exports:
+- Export ship inventory as CSV
+- Export equipment inventory as CSV
+- Export a normalized inventory snapshot as JSON
+- Export ship CSV and equipment CSV together from one button
+- Keep ship and equipment names in Japanese master-data naming
 
-- ship CSV
-- equipment CSV
-- inventory JSON
-- both files in one run
-
-Design goals:
-
-- read Poi state only when export is clicked
-- avoid reactive inventory subscriptions
-- write Excel-friendly UTF-8 BOM CSV files
-- write machine-friendly normalized JSON without a BOM
-- keep ship and equipment names in Japanese master-data naming
-
-## Exported Files
+## Export formats
 
 ### Ship CSV
 
@@ -29,20 +20,18 @@ Default filename:
 
 - `kancolle_kan_YY-MM-DD.csv`
 
-Current output shape:
+Current output includes:
 
-- 59 columns
-- includes:
-  - ship instance ID
-  - Japanese ship name
-  - reading
-  - fleet membership
-  - sortie area
-  - stats
-  - equipped items
-  - extra slot item
-  - lock / HP / repair state
-  - next remodel name
+- ship instance ID
+- Japanese ship name
+- reading
+- fleet membership
+- sortie area
+- stats
+- equipped items
+- extra slot item
+- lock / HP / repair state
+- next remodel name
 
 ### Equipment CSV
 
@@ -50,7 +39,7 @@ Default filename:
 
 - `kancolle_equips_YYYY-MM-DD.csv`
 
-Current output shape:
+Current columns:
 
 - `ID (Instance)`
 - `Master ID`
@@ -67,61 +56,106 @@ Default filename:
 
 - `kancolle_inventory_YYYY-MM-DD.json`
 
-Current output shape:
+Current shape:
 
 - top-level `schema_version`, `exported_at`, `source`
-- normalized `fleets`, `ships`, and `equipments` arrays
-- ship and equipment relationships expressed via instance/master IDs
-- schema version is currently `inventory_snapshot_v1`
-- uses `null` for missing values instead of `NA`
-- keeps ship and equipment names in Japanese master-data naming
+- normalized `fleets`, `ships`, and `equipments`
+- ID-based links between ships and equipments
+- `null` for missing values
+- schema version `inventory_snapshot_v1`
 
-## Build
+## Install
+
+Poi plugins should be installed through Poi's own plugin npm directory.
+Do not symlink this repo into Poi `node_modules`.
+
+### 1. Build a tarball
 
 ```sh
-cd /path/to/repo
+cd /path/to/poi-plugin-kc-inventory-export
 npm install
 npm run build
 npm pack --pack-destination dist --cache "$TMPDIR/poi-inventory-export-cache"
 ```
 
-`npm run build` currently runs type checking so the package can be validated before packing.
+This creates a tarball like:
 
-## Install
+```text
+dist/poi-plugin-kc-equipment-export-0.1.3.tgz
+```
 
-Install into Poi using its own plugin npm directory. Do not symlink plugin folders into Poi `node_modules`.
+### 2. Install into Poi
 
 ```sh
 cd "/path/to/poi/plugins"
-npm install "/path/to/repo/dist/poi-plugin-kc-equipment-export-0.17.2.tgz"
+npm install "/path/to/poi-plugin-kc-inventory-export/dist/poi-plugin-kc-equipment-export-0.1.3.tgz"
 ```
 
-To remove it:
+On macOS, Poi's plugin directory is usually:
+
+```text
+~/Library/Application Support/poi/plugins
+```
+
+### 3. Restart Poi
+
+After installation, restart Poi and open:
+
+```text
+KC Inventory Export
+```
+
+## Update
+
+When you update the plugin:
+
+1. pull the latest code
+2. rebuild the tarball
+3. reinstall the new `.tgz` into Poi's plugin directory
+4. restart Poi
+
+Example:
+
+```sh
+cd /path/to/poi-plugin-kc-inventory-export
+npm install
+npm run build
+npm pack --pack-destination dist --cache "$TMPDIR/poi-inventory-export-cache"
+
+cd "/path/to/poi/plugins"
+npm install "/path/to/poi-plugin-kc-inventory-export/dist/poi-plugin-kc-equipment-export-0.1.3.tgz"
+```
+
+## Uninstall
 
 ```sh
 cd "/path/to/poi/plugins"
 npm uninstall poi-plugin-kc-equipment-export
 ```
 
-## Use
+## Usage
 
 1. Start Poi and let game data finish loading.
 2. Open `KC Inventory Export`.
 3. Choose one action:
-   `Export ship + equipment CSVs`
-   `Export ship CSV`
-   `Export inventory JSON`
-   `Export equipment CSV`
-4. Pick save locations in Poi's file dialog.
+   - `Export ship + equipment CSVs`
+   - `Export ship CSV`
+   - `Export inventory JSON`
+   - `Export equipment CSV`
+4. Choose save locations in Poi's file dialog.
 
-## Validation Checklist
+## Development
 
-Recommended validation order:
+```sh
+cd /path/to/poi-plugin-kc-inventory-export
+npm install
+npm run typeCheck
+npm test -- --runInBand
+```
 
-1. Poi boots normally.
-2. The plugin opens normally.
-3. Each export action opens the save dialog.
-4. Ship CSV contains the expected 59 columns and the expected ship count.
-5. Equipment CSV contains the expected 8 columns and the expected equipment count.
-6. Inventory JSON contains `fleets`, `ships`, and `equipments` with stable IDs.
-7. Canceling any save dialog exits cleanly without freezing Poi.
+## Notes
+
+- The plugin reads Poi state only when an export action is clicked.
+- The UI follows Poi / Blueprint light-dark theme behavior.
+- CSV output is written with UTF-8 BOM for spreadsheet compatibility.
+- JSON output is written without BOM for easier machine parsing.
