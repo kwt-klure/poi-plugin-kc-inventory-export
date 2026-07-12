@@ -22,5 +22,6 @@
   "Ship CSV exported, equipment CSV export canceled": "艦娘 CSV は書き出されましたが、装備 CSV のエクスポートはキャンセルされました。",
   "Inventory export settings description": "このプラグインはメイン画面から艦娘 / 装備 CSV のワンクリック書き出しと、machine-friendly な inventory JSON 出力を提供します。",
   "Inventory export settings hint": "最も安全な導入手順は、ワークスペースでパックしてから Poi のプラグイン npm 環境へ tarball をインストールする方法です。",
+  "Background auto export path": "バックグラウンド自動書き出し先: {{path}}",
   "Version": "バージョン: {{version}}"
 }

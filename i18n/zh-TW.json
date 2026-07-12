@@ -22,5 +22,6 @@
   "Ship CSV exported, equipment CSV export canceled": "艦娘 CSV 已匯出，但裝備 CSV 匯出已取消。",
   "Inventory export settings description": "這個插件提供主畫面的一鍵艦娘 / 裝備 CSV 匯出，以及 machine-friendly 的 inventory JSON 匯出。",
   "Inventory export settings hint": "最安全的安裝方式是先在工作區打包，再用 Poi 的插件 npm 環境安裝 tarball。",
+  "Background auto export path": "背景自動匯出資料夾：{{path}}",
   "Version": "版本: {{version}}"
 }

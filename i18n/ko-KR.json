@@ -22,5 +22,6 @@
   "Ship CSV exported, equipment CSV export canceled": "함선 CSV 는 내보냈지만 장비 CSV 내보내기는 취소했습니다.",
   "Inventory export settings description": "이 플러그인은 메인 화면에서 함선 / 장비 CSV 와 machine-friendly 한 inventory JSON 을 바로 내보내는 기능을 제공합니다.",
   "Inventory export settings hint": "가장 안전한 설치 경로는 워크스페이스에서 패키징한 뒤 Poi 플러그인 npm 환경에 tarball 을 설치하는 방식입니다.",
+  "Background auto export path": "백그라운드 자동 내보내기 폴더: {{path}}",
   "Version": "버전: {{version}}"
 }

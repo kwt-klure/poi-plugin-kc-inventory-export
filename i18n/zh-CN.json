@@ -22,5 +22,6 @@
   "Ship CSV exported, equipment CSV export canceled": "舰娘 CSV 已导出，但装备 CSV 导出已取消。",
   "Inventory export settings description": "这个插件提供主画面的一键舰娘 / 装备 CSV 导出，以及 machine-friendly 的 inventory JSON 导出。",
   "Inventory export settings hint": "最安全的安装方式是先在工作区打包，再用 Poi 的插件 npm 环境安装 tarball。",
+  "Background auto export path": "后台自动导出目录：{{path}}",
   "Version": "版本: {{version}}"
 }

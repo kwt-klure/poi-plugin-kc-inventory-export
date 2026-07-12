@@ -1,11 +1,15 @@
+import PKG from '../../package.json'
 import {
   buildEquipmentCsvFromPoiState,
   buildInventoryJsonFromPoiState,
   buildShipCsvFromPoiState,
   exportEquipmentCsvToFile,
+  exportInventoryBundleToDefaultDirectory,
   exportInventoryJsonToFile,
   exportShipCsvToFile,
+  getDefaultExportDirectory,
   getEquipmentCsvFileName,
+  getDefaultExportDirectoryHint,
   getInventoryJsonFileName,
   getShipCsvFileName,
   INVENTORY_JSON_SCHEMA_VERSION,
@@ -335,7 +339,7 @@ describe('buildInventoryJsonFromPoiState', () => {
     expect(snapshot.source).toEqual({
       package_name: 'poi-plugin-kc-equipment-export',
       plugin_title: 'KC Inventory Export',
-      plugin_version: '0.1.3',
+      plugin_version: PKG.version,
       format: 'normalized_json',
     })
     expect(snapshot.fleets).toEqual([
@@ -552,6 +556,62 @@ describe('getInventoryJsonFileName', () => {
   })
 })
 
+describe('getDefaultExportDirectoryHint', () => {
+  test('uses the fixed Mira workspace export lane', () => {
+    expect(getDefaultExportDirectoryHint()).toBe(
+      '~/Documents/Mira-Workspace/archive/poi-inventory-exports',
+    )
+  })
+})
+
+describe('getDefaultExportDirectory', () => {
+  const originalPoiVersion = (globalThis as { POI_VERSION?: string }).POI_VERSION
+  const originalRemote = (globalThis as { remote?: unknown }).remote
+
+  beforeEach(() => {
+    ;(globalThis as { POI_VERSION?: string }).POI_VERSION = 'test'
+  })
+
+  afterEach(() => {
+    if (originalPoiVersion == null) {
+      delete (globalThis as { POI_VERSION?: string }).POI_VERSION
+    } else {
+      ;(globalThis as { POI_VERSION?: string }).POI_VERSION = originalPoiVersion
+    }
+
+    if (originalRemote == null) {
+      delete (globalThis as { remote?: unknown }).remote
+    } else {
+      ;(globalThis as { remote?: unknown }).remote = originalRemote
+    }
+
+    jest.restoreAllMocks()
+  })
+
+  test('resolves the fixed export lane under the current home directory', () => {
+    ;(globalThis as { remote?: unknown }).remote = {
+      app: {
+        getPath: jest.fn().mockImplementation((name: string) =>
+          name === 'home' ? '/Users/tester' : '/documents',
+        ),
+      },
+      require: jest.fn().mockImplementation((name: string) => {
+        if (name === 'path') {
+          return {
+            join: (...parts: string[]) => parts.join('/').replace(/\/+/g, '/'),
+          }
+        }
+
+        return null
+      }),
+    }
+
+    expect(getDefaultExportDirectory()).toBe(
+      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports',
+    )
+  })
+})
+
 describe('exportEquipmentCsvToFile', () => {
   const originalPoiVersion = (globalThis as { POI_VERSION?: string }).POI_VERSION
   const originalRemote = (globalThis as { remote?: unknown }).remote
@@ -617,6 +677,159 @@ describe('exportEquipmentCsvToFile', () => {
     await expect(
       exportEquipmentCsvToFile('header', new Date(2026, 2, 12)),
     ).resolves.toBe(false)
+  })
+})
+
+describe('exportInventoryBundleToDefaultDirectory', () => {
+  const originalPoiVersion = (globalThis as { POI_VERSION?: string }).POI_VERSION
+  const originalRemote = (globalThis as { remote?: unknown }).remote
+
+  beforeEach(() => {
+    ;(globalThis as { POI_VERSION?: string }).POI_VERSION = 'test'
+  })
+
+  afterEach(() => {
+    if (originalPoiVersion == null) {
+      delete (globalThis as { POI_VERSION?: string }).POI_VERSION
+    } else {
+      ;(globalThis as { POI_VERSION?: string }).POI_VERSION = originalPoiVersion
+    }
+
+    if (originalRemote == null) {
+      delete (globalThis as { remote?: unknown }).remote
+    } else {
+      ;(globalThis as { remote?: unknown }).remote = originalRemote
+    }
+
+    jest.restoreAllMocks()
+  })
+
+  test('writes ship, equipment, and inventory files into the fixed export folder', () => {
+    const mkdirSync = jest.fn()
+    const writeFileSync = jest.fn()
+    const existsSync = jest.fn().mockReturnValue(false)
+    const readFileSync = jest.fn()
+
+    ;(globalThis as { remote?: unknown }).remote = {
+      app: {
+        getPath: jest.fn().mockImplementation((name: string) =>
+          name === 'home' ? '/Users/tester' : '/documents',
+        ),
+      },
+      require: jest.fn().mockImplementation((name: string) => {
+        if (name === 'path') {
+          return {
+            join: (...parts: string[]) => parts.join('/').replace(/\/+/g, '/'),
+          }
+        }
+
+        if (name === 'fs') {
+          return {
+            existsSync,
+            mkdirSync,
+            readFileSync,
+            writeFileSync,
+          }
+        }
+
+        return null
+      }),
+    }
+
+    const paths = exportInventoryBundleToDefaultDirectory(
+      basePoiState,
+      new Date(2026, 2, 12, 9, 10, 11),
+    )
+
+    expect(paths).toEqual({
+      exportDirectory:
+        '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports',
+      shipCsvPath:
+        '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports/kancolle_kan_26-03-12.csv',
+      equipmentCsvPath:
+        '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports/kancolle_equips_2026-03-12.csv',
+      inventoryJsonPath:
+        '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports/kancolle_inventory_2026-03-12.json',
+    })
+    expect(mkdirSync).toHaveBeenCalledWith(
+      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports',
+      { recursive: true },
+    )
+    expect(writeFileSync).toHaveBeenCalledWith(
+      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports/kancolle_kan_26-03-12.csv',
+      expect.stringMatching(/^\uFEFF/),
+    )
+    expect(writeFileSync).toHaveBeenCalledWith(
+      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports/kancolle_equips_2026-03-12.csv',
+      expect.stringMatching(/^\uFEFF/),
+    )
+    expect(writeFileSync).toHaveBeenCalledWith(
+      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports/kancolle_inventory_2026-03-12.json',
+      expect.stringContaining('"schema_version": "inventory_snapshot_v1"'),
+    )
+  })
+
+  test('falls back to local-fallback when the archive export folder is unavailable', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const mkdirSync = jest.fn().mockImplementation((directory: string) => {
+      if (directory.includes('/archive/')) {
+        throw new Error('ENOENT: external archive is not mounted')
+      }
+    })
+    const writeFileSync = jest.fn()
+    const existsSync = jest.fn().mockReturnValue(false)
+    const readFileSync = jest.fn()
+
+    ;(globalThis as { remote?: unknown }).remote = {
+      app: {
+        getPath: jest.fn().mockImplementation((name: string) =>
+          name === 'home' ? '/Users/tester' : '/documents',
+        ),
+      },
+      require: jest.fn().mockImplementation((name: string) => {
+        if (name === 'path') {
+          return {
+            join: (...parts: string[]) => parts.join('/').replace(/\/+/g, '/'),
+          }
+        }
+
+        if (name === 'fs') {
+          return {
+            existsSync,
+            mkdirSync,
+            readFileSync,
+            writeFileSync,
+          }
+        }
+
+        return null
+      }),
+    }
+
+    const paths = exportInventoryBundleToDefaultDirectory(
+      basePoiState,
+      new Date(2026, 2, 12, 9, 10, 11),
+    )
+
+    expect(paths.exportDirectory).toBe(
+      '/Users/tester/Documents/Mira-Workspace/local-fallback/poi-inventory-exports',
+    )
+    expect(mkdirSync).toHaveBeenCalledWith(
+      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports',
+      { recursive: true },
+    )
+    expect(mkdirSync).toHaveBeenCalledWith(
+      '/Users/tester/Documents/Mira-Workspace/local-fallback/poi-inventory-exports',
+      { recursive: true },
+    )
+    expect(writeFileSync).toHaveBeenCalledWith(
+      '/Users/tester/Documents/Mira-Workspace/local-fallback/poi-inventory-exports/kancolle_inventory_2026-03-12.json',
+      expect.stringContaining('"schema_version": "inventory_snapshot_v1"'),
+    )
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[KC Inventory Export] Primary archive export failed; using local fallback.',
+      expect.any(Error),
+    )
   })
 })
 
