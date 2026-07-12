@@ -190,9 +190,7 @@ type PoiRemote = {
       filters: Array<{ name: string; extensions: string[] }>
     }) => Promise<{ canceled: boolean; filePath?: string }>
   }
-  require?: (name: string) => {
-    writeFileSync: (path: string, data: string) => void
-  }
+  require?: (name: string) => unknown
 }
 
 type TextExportOptions = {
@@ -201,7 +199,26 @@ type TextExportOptions = {
   prependUtf8Bom?: boolean
 }
 
+export type InventoryBundlePaths = {
+  exportDirectory: string
+  shipCsvPath: string
+  equipmentCsvPath: string
+  inventoryJsonPath: string
+}
+
 const UTF8_BOM = '\uFEFF'
+export const DEFAULT_EXPORT_DIRECTORY_SEGMENTS = [
+  'Documents',
+  'Mira-Workspace',
+  'archive',
+  'poi-inventory-exports',
+] as const
+export const FALLBACK_EXPORT_DIRECTORY_SEGMENTS = [
+  'Documents',
+  'Mira-Workspace',
+  'local-fallback',
+  'poi-inventory-exports',
+] as const
 const PROFICIENCY_TYPE_IDS = new Set([
   6, 7, 8, 9, 10, 11, 25, 26, 41, 45, 47, 48, 56, 57, 58,
 ])
@@ -241,6 +258,96 @@ export const getInventoryJsonFileName = (date = new Date()) =>
   `kancolle_inventory_${date.getFullYear()}-${pad2(
     date.getMonth() + 1,
   )}-${pad2(date.getDate())}.json`
+
+export const getDefaultExportDirectoryHint = () =>
+  `~/${DEFAULT_EXPORT_DIRECTORY_SEGMENTS.join('/')}`
+
+type PoiFsModule = {
+  existsSync?: (path: string) => boolean
+  mkdirSync?: (path: string, options?: { recursive?: boolean }) => void
+  readFileSync?: (path: string, encoding: string) => string
+  writeFileSync: (path: string, data: string) => void
+}
+
+type PoiPathModule = {
+  join: (...paths: string[]) => string
+}
+
+const getPoiRemote = (): PoiRemote => {
+  if (!('POI_VERSION' in globalThis)) {
+    throw new Error('You are not currently in the poi environment.')
+  }
+
+  const remote = (globalThis as { remote?: PoiRemote }).remote
+  if (!remote) {
+    throw new Error('Poi remote bridge is unavailable.')
+  }
+
+  return remote
+}
+
+const getPoiFs = (remote: PoiRemote): PoiFsModule => {
+  const fs = remote.require?.('fs') as PoiFsModule | undefined
+  if (!fs?.writeFileSync) {
+    throw new Error('Poi fs bridge is unavailable.')
+  }
+
+  return fs
+}
+
+const getPoiPath = (remote: PoiRemote): PoiPathModule => {
+  const path = remote.require?.('path') as PoiPathModule | undefined
+  if (!path?.join) {
+    throw new Error('Poi path bridge is unavailable.')
+  }
+
+  return path
+}
+
+const getWorkspaceExportDirectory = (
+  segments: readonly string[],
+) => {
+  const remote = getPoiRemote()
+  if (!remote.app?.getPath) {
+    throw new Error('Poi app path bridge is unavailable.')
+  }
+
+  const path = getPoiPath(remote)
+  return path.join(remote.app.getPath('home'), ...segments)
+}
+
+export const getDefaultExportDirectory = () =>
+  getWorkspaceExportDirectory(DEFAULT_EXPORT_DIRECTORY_SEGMENTS)
+
+export const getFallbackExportDirectory = () =>
+  getWorkspaceExportDirectory(FALLBACK_EXPORT_DIRECTORY_SEGMENTS)
+
+const writeTextToDirectory = (
+  contents: string,
+  directory: string,
+  fileName: string,
+  options: Pick<TextExportOptions, 'prependUtf8Bom'>,
+) => {
+  const remote = getPoiRemote()
+  const fs = getPoiFs(remote)
+  const path = getPoiPath(remote)
+  const filePath = path.join(directory, fileName)
+  const fileContents = options.prependUtf8Bom ? `${UTF8_BOM}${contents}` : contents
+
+  if (!fs.mkdirSync || !fs.existsSync || !fs.readFileSync) {
+    throw new Error('Poi directory export bridge is unavailable.')
+  }
+
+  fs.mkdirSync(directory, { recursive: true })
+
+  const alreadyExists = fs.existsSync(filePath)
+  const existingContents = alreadyExists ? fs.readFileSync(filePath, 'utf8') : null
+  if (existingContents !== fileContents) {
+    fs.writeFileSync(filePath, fileContents)
+  }
+
+  return filePath
+}
 
 const getById = <T>(
   collection: Record<string, T> | T[] | undefined,
@@ -815,13 +922,12 @@ const exportTextToFile = async (
   exportLabel: string,
   options: TextExportOptions,
 ) => {
-  if (!('POI_VERSION' in globalThis)) {
-    throw new Error(
-      `Failed to export ${exportLabel}. You are not currently in the poi environment.`,
-    )
+  let remote: PoiRemote
+  try {
+    remote = getPoiRemote()
+  } catch (error) {
+    throw new Error(`Failed to export ${exportLabel}. ${(error as Error).message}`)
   }
-
-  const remote = (globalThis as { remote?: PoiRemote }).remote
 
   if (
     !remote?.app?.getPath ||
@@ -841,10 +947,85 @@ const exportTextToFile = async (
     return false
   }
 
-  const fs = remote.require('fs')
+  const fs = getPoiFs(remote)
   const fileContents = options.prependUtf8Bom ? `${UTF8_BOM}${contents}` : contents
   fs.writeFileSync(result.filePath, fileContents)
   return true
+}
+
+export const exportEquipmentCsvToDirectory = (
+  csv: string,
+  directory: string,
+  date = new Date(),
+) =>
+  writeTextToDirectory(csv, directory, getEquipmentCsvFileName(date), {
+    prependUtf8Bom: true,
+  })
+
+export const exportShipCsvToDirectory = (
+  csv: string,
+  directory: string,
+  date = new Date(),
+) =>
+  writeTextToDirectory(csv, directory, getShipCsvFileName(date), {
+    prependUtf8Bom: true,
+  })
+
+export const exportInventoryJsonToDirectory = (
+  json: string,
+  directory: string,
+  date = new Date(),
+) =>
+  writeTextToDirectory(json, directory, getInventoryJsonFileName(date), {
+    prependUtf8Bom: false,
+  })
+
+export const exportInventoryBundleToDirectory = (
+  state: PoiState,
+  directory: string,
+  date = new Date(),
+): InventoryBundlePaths => {
+  const shipCsv = buildShipCsvFromPoiState(state)
+  const equipmentCsv = buildEquipmentCsvFromPoiState(state)
+  const inventoryJson = buildInventoryJsonFromPoiState(state, date)
+
+  return {
+    exportDirectory: directory,
+    shipCsvPath: exportShipCsvToDirectory(shipCsv, directory, date),
+    equipmentCsvPath: exportEquipmentCsvToDirectory(
+      equipmentCsv,
+      directory,
+      date,
+    ),
+    inventoryJsonPath: exportInventoryJsonToDirectory(
+      inventoryJson,
+      directory,
+      date,
+    ),
+  }
+}
+
+export const exportInventoryBundleToDefaultDirectory = (
+  state: PoiState,
+  date = new Date(),
+) => {
+  try {
+    return exportInventoryBundleToDirectory(
+      state,
+      getDefaultExportDirectory(),
+      date,
+    )
+  } catch (error) {
+    console.warn(
+      '[KC Inventory Export] Primary archive export failed; using local fallback.',
+      error,
+    )
+    return exportInventoryBundleToDirectory(
+      state,
+      getFallbackExportDirectory(),
+      date,
+    )
+  }
 }
 
 export const exportEquipmentCsvToFile = async (

@@ -2,6 +2,11 @@ import { Callout, Divider, H5 } from '@blueprintjs/core'
 import React, { StrictMode } from 'react'
 
 import PKG from '../package.json'
+import {
+  getDefaultExportDirectory,
+  getDefaultExportDirectoryHint,
+} from './export'
+import { IN_POI } from './poi/env'
 import { usePluginTranslation } from './poi/hooks'
 import { usePoiTheme } from './poi/theme'
 import {
@@ -16,6 +21,9 @@ import {
 export const SettingsMain = () => {
   const { t } = usePluginTranslation()
   const { isDark, rootRef } = usePoiTheme<HTMLDivElement>()
+  const defaultExportDirectory = IN_POI
+    ? getDefaultExportDirectory()
+    : getDefaultExportDirectoryHint()
 
   return (
     <PageRoot ref={rootRef}>
@@ -27,6 +35,12 @@ export const SettingsMain = () => {
           </SectionHeader>
           <Callout intent="primary">
             {t('Inventory export settings hint')}
+          </Callout>
+          <Divider />
+          <Callout intent="success">
+            {t('Background auto export path', {
+              path: defaultExportDirectory,
+            })}
           </Callout>
           <Divider />
           <MetaText $isDark={isDark}>

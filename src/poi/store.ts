@@ -11,6 +11,7 @@ const createFallbackState = (state?: PoiState): PoiState => ({
 })
 
 const genFallbackStore = (state?: PoiState): Store<PoiState> => ({
+  __isFallbackStore: true,
   getState: () => createFallbackState(state),
   subscribe: () => () => {},
 })
@@ -20,7 +21,7 @@ let globalStore: Store<PoiState> | null = null
  * Get poi global Store if in poi env
  */
 export const getPoiStore: () => Promise<Store<PoiState>> = async () => {
-  if (globalStore !== null) {
+  if (globalStore !== null && !globalStore.__isFallbackStore) {
     return globalStore
   }
   if (IN_POI) {
@@ -32,8 +33,13 @@ export const getPoiStore: () => Promise<Store<PoiState>> = async () => {
       console.warn('Load global store error', error)
     }
   }
-  globalStore = genFallbackStore()
-  return globalStore
+
+  if (!IN_POI) {
+    globalStore = genFallbackStore()
+    return globalStore
+  }
+
+  return genFallbackStore()
 }
 
 export const exportPoiState = async () => {

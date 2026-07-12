@@ -22,5 +22,6 @@
   "Ship CSV exported, equipment CSV export canceled": "Ship CSV exported, equipment CSV export canceled.",
   "Inventory export settings description": "This plugin provides one-click ship/equipment CSV exports plus a normalized inventory JSON export from the main plugin window.",
   "Inventory export settings hint": "For the safest install path, pack the plugin and install the generated tarball through Poi's plugin npm environment.",
+  "Background auto export path": "Background auto-export folder: {{path}}",
   "Version": "Version: {{version}}"
 }

@@ -82,6 +82,7 @@ export type PoiState = {
 }
 
 export type Store<S> = {
+  __isFallbackStore?: boolean
   getState: () => S
   subscribe: (listener: () => void) => () => void
 }
