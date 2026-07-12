@@ -1,4 +1,6 @@
 import PKG from '../package.json'
+import { writeFileAtomicSync } from './atomicWrite'
+import { resolvePoiInventoryExportDirectory } from './exportDirectory'
 import type {
   PoiEquipment,
   PoiEquipmentMaster,
@@ -263,10 +265,16 @@ export const getDefaultExportDirectoryHint = () =>
   `~/${DEFAULT_EXPORT_DIRECTORY_SEGMENTS.join('/')}`
 
 type PoiFsModule = {
-  existsSync?: (path: string) => boolean
+  existsSync: (path: string) => boolean
   mkdirSync?: (path: string, options?: { recursive?: boolean }) => void
   readFileSync?: (path: string, encoding: string) => string
-  writeFileSync: (path: string, data: string) => void
+  realpathSync?: (path: string) => string
+  openSync: (path: string, flags: string, mode?: number) => number
+  writeFileSync: (file: string | number, data: string) => void
+  fsyncSync: (fileDescriptor: number) => void
+  closeSync: (fileDescriptor: number) => void
+  renameSync: (oldPath: string, newPath: string) => void
+  unlinkSync: (path: string) => void
 }
 
 type PoiPathModule = {
@@ -288,7 +296,15 @@ const getPoiRemote = (): PoiRemote => {
 
 const getPoiFs = (remote: PoiRemote): PoiFsModule => {
   const fs = remote.require?.('fs') as PoiFsModule | undefined
-  if (!fs?.writeFileSync) {
+  if (
+    !fs?.writeFileSync ||
+    !fs.existsSync ||
+    !fs.openSync ||
+    !fs.fsyncSync ||
+    !fs.closeSync ||
+    !fs.renameSync ||
+    !fs.unlinkSync
+  ) {
     throw new Error('Poi fs bridge is unavailable.')
   }
 
@@ -316,8 +332,21 @@ const getWorkspaceExportDirectory = (
   return path.join(remote.app.getPath('home'), ...segments)
 }
 
-export const getDefaultExportDirectory = () =>
-  getWorkspaceExportDirectory(DEFAULT_EXPORT_DIRECTORY_SEGMENTS)
+export const getDefaultExportDirectory = () => {
+  const remote = getPoiRemote()
+  if (!remote.app?.getPath) {
+    throw new Error('Poi app path bridge is unavailable.')
+  }
+
+  const fs = getPoiFs(remote)
+  const path = getPoiPath(remote)
+  return resolvePoiInventoryExportDirectory({
+    documentsPath: remote.app.getPath('documents'),
+    existsSync: fs.existsSync,
+    joinPath: path.join,
+    realpathSync: fs.realpathSync,
+  }).path
+}
 
 export const getFallbackExportDirectory = () =>
   getWorkspaceExportDirectory(FALLBACK_EXPORT_DIRECTORY_SEGMENTS)
@@ -343,7 +372,7 @@ const writeTextToDirectory = (
   const alreadyExists = fs.existsSync(filePath)
   const existingContents = alreadyExists ? fs.readFileSync(filePath, 'utf8') : null
   if (existingContents !== fileContents) {
-    fs.writeFileSync(filePath, fileContents)
+    writeFileAtomicSync({ fs, filePath, contents: fileContents })
   }
 
   return filePath
@@ -949,7 +978,11 @@ const exportTextToFile = async (
 
   const fs = getPoiFs(remote)
   const fileContents = options.prependUtf8Bom ? `${UTF8_BOM}${contents}` : contents
-  fs.writeFileSync(result.filePath, fileContents)
+  writeFileAtomicSync({
+    fs,
+    filePath: result.filePath,
+    contents: fileContents,
+  })
   return true
 }
 
@@ -1008,25 +1041,7 @@ export const exportInventoryBundleToDirectory = (
 export const exportInventoryBundleToDefaultDirectory = (
   state: PoiState,
   date = new Date(),
-) => {
-  try {
-    return exportInventoryBundleToDirectory(
-      state,
-      getDefaultExportDirectory(),
-      date,
-    )
-  } catch (error) {
-    console.warn(
-      '[KC Inventory Export] Primary archive export failed; using local fallback.',
-      error,
-    )
-    return exportInventoryBundleToDirectory(
-      state,
-      getFallbackExportDirectory(),
-      date,
-    )
-  }
-}
+) => exportInventoryBundleToDirectory(state, getDefaultExportDirectory(), date)
 
 export const exportEquipmentCsvToFile = async (
   csv: string,

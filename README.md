@@ -67,16 +67,29 @@ Current shape:
 
 ## Install
 
-Install the npm package through Poi's plugin manager using:
+Poi plugins should be installed through Poi's own plugin npm directory.
+Do not symlink this repo into Poi `node_modules`.
 
-```text
-poi-plugin-kc-equipment-export
-```
-
-For a direct npm install, run this from Poi's plugin directory:
+### 1. Build a tarball
 
 ```sh
-npm install poi-plugin-kc-equipment-export@latest
+cd /path/to/poi-plugin-kc-inventory-export
+npm install
+npm run build
+npm pack --pack-destination dist --cache "$TMPDIR/poi-inventory-export-cache"
+```
+
+This creates a tarball like:
+
+```text
+dist/poi-plugin-kc-equipment-export-0.1.6.tgz
+```
+
+### 2. Install into Poi
+
+```sh
+cd "/path/to/poi/plugins"
+npm install "/path/to/poi-plugin-kc-inventory-export/dist/poi-plugin-kc-equipment-export-0.1.6.tgz"
 ```
 
 On macOS, Poi's plugin directory is usually:
@@ -85,12 +98,24 @@ On macOS, Poi's plugin directory is usually:
 ~/Library/Application Support/poi/plugins
 ```
 
-Restart Poi after installation. Do not symlink this repository into Poi
-`node_modules`.
+### 3. Restart Poi
 
-### Local development install
+After installation, restart Poi and open:
 
-For unreleased development builds, create and install a tarball:
+```text
+KC Inventory Export
+```
+
+## Update
+
+When you update the plugin:
+
+1. pull the latest code
+2. rebuild the tarball
+3. reinstall the new `.tgz` into Poi's plugin directory
+4. restart Poi
+
+Example:
 
 ```sh
 cd /path/to/poi-plugin-kc-inventory-export
@@ -99,18 +124,8 @@ npm run build
 npm pack --pack-destination dist --cache "$TMPDIR/poi-inventory-export-cache"
 
 cd "/path/to/poi/plugins"
-npm install "/path/to/poi-plugin-kc-inventory-export/dist/poi-plugin-kc-equipment-export-VERSION.tgz"
+npm install "/path/to/poi-plugin-kc-inventory-export/dist/poi-plugin-kc-equipment-export-0.1.6.tgz"
 ```
-
-## Update
-
-Use Poi's plugin update flow, or update directly from Poi's plugin directory:
-
-```sh
-npm install poi-plugin-kc-equipment-export@latest
-```
-
-Restart Poi after the package is updated.
 
 ## Uninstall
 
@@ -143,7 +158,7 @@ unmounted external volume, the plugin writes the same files to:
 ~/Documents/Mira-Workspace/local-fallback/poi-inventory-exports
 ```
 
-The plugin refreshes the same-day ship CSV, equipment CSV, and inventory JSON files in that folder whenever Poi inventory state changes.
+The plugin refreshes the same-day ship CSV, equipment CSV, and inventory JSON files in that folder whenever Poi inventory state changes. Archive is selected only when it resolves to the expected external archive; otherwise the plugin selects local-fallback before writing. File replacement uses a same-directory temporary file, `fsync`, and atomic rename so readers cannot observe a partially rewritten export.
 
 ## Development
 
@@ -156,8 +171,7 @@ npm test -- --runInBand
 
 ## Notes
 
-- The plugin reads Poi inventory state for manual exports and watches relevant
-  inventory references for debounced background refreshes while Poi is running.
+- The plugin reads Poi state for manual exports and through the debounced background watcher that maintains the current export bundle.
 - The UI follows Poi / Blueprint light-dark theme behavior.
 - CSV output is written with UTF-8 BOM for spreadsheet compatibility.
 - JSON output is written without BOM for easier machine parsing.

@@ -17,6 +17,17 @@ import {
 } from '../export'
 import type { PoiState } from '../poi/types'
 
+const createAtomicFs = (overrides: Record<string, unknown> = {}) => ({
+  existsSync: jest.fn(() => false),
+  openSync: jest.fn(() => 42),
+  writeFileSync: jest.fn(),
+  fsyncSync: jest.fn(),
+  closeSync: jest.fn(),
+  renameSync: jest.fn(),
+  unlinkSync: jest.fn(),
+  ...overrides,
+})
+
 const basePoiState: PoiState = {
   ui: { activeMainTab: '' },
   plugins: [],
@@ -588,11 +599,21 @@ describe('getDefaultExportDirectory', () => {
     jest.restoreAllMocks()
   })
 
-  test('resolves the fixed export lane under the current home directory', () => {
+  test('resolves archive when it points to the expected external archive', () => {
+    const localArchive = '/Users/tester/Documents/Mira-Workspace/archive'
+    const externalArchive = '/Volumes/Mira External/Mira-Workspace/archive'
+    const fs = createAtomicFs({
+      existsSync: jest.fn(
+        (path: string) => path === localArchive || path === externalArchive,
+      ),
+      realpathSync: jest.fn((path: string) =>
+        path === localArchive ? externalArchive : path,
+      ),
+    })
     ;(globalThis as { remote?: unknown }).remote = {
       app: {
         getPath: jest.fn().mockImplementation((name: string) =>
-          name === 'home' ? '/Users/tester' : '/documents',
+          name === 'home' ? '/Users/tester' : '/Users/tester/Documents',
         ),
       },
       require: jest.fn().mockImplementation((name: string) => {
@@ -600,6 +621,10 @@ describe('getDefaultExportDirectory', () => {
           return {
             join: (...parts: string[]) => parts.join('/').replace(/\/+/g, '/'),
           }
+        }
+
+        if (name === 'fs') {
+          return fs
         }
 
         return null
@@ -638,6 +663,7 @@ describe('exportEquipmentCsvToFile', () => {
 
   test('writes UTF-8 BOM CSV via poi save dialog', async () => {
     const writeFileSync = jest.fn()
+    const renameSync = jest.fn()
     const showSaveDialog = jest.fn().mockResolvedValue({
       canceled: false,
       filePath: '/tmp/kancolle_equips_2026-03-12.csv',
@@ -646,7 +672,9 @@ describe('exportEquipmentCsvToFile', () => {
     ;(globalThis as { remote?: unknown }).remote = {
       app: { getPath: jest.fn().mockReturnValue('/documents') },
       dialog: { showSaveDialog },
-      require: jest.fn().mockReturnValue({ writeFileSync }),
+      require: jest
+        .fn()
+        .mockReturnValue(createAtomicFs({ writeFileSync, renameSync })),
     }
 
     const saved = await exportEquipmentCsvToFile(
@@ -660,8 +688,14 @@ describe('exportEquipmentCsvToFile', () => {
       filters: [{ name: 'CSV', extensions: ['csv'] }],
     })
     expect(writeFileSync).toHaveBeenCalledWith(
-      '/tmp/kancolle_equips_2026-03-12.csv',
+      42,
       '\uFEFFheader\nrow',
+    )
+    expect(renameSync).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^\/tmp\/kancolle_equips_2026-03-12\.csv\..+\.tmp$/,
+      ),
+      '/tmp/kancolle_equips_2026-03-12.csv',
     )
   })
 
@@ -709,11 +743,18 @@ describe('exportInventoryBundleToDefaultDirectory', () => {
     const writeFileSync = jest.fn()
     const existsSync = jest.fn().mockReturnValue(false)
     const readFileSync = jest.fn()
+    const renameSync = jest.fn()
+    const localArchive = '/Users/tester/Documents/Mira-Workspace/archive'
+    const externalArchive = '/Volumes/Mira External/Mira-Workspace/archive'
+    existsSync.mockImplementation(
+      (filePath: string) =>
+        filePath === localArchive || filePath === externalArchive,
+    )
 
     ;(globalThis as { remote?: unknown }).remote = {
       app: {
         getPath: jest.fn().mockImplementation((name: string) =>
-          name === 'home' ? '/Users/tester' : '/documents',
+          name === 'home' ? '/Users/tester' : '/Users/tester/Documents',
         ),
       },
       require: jest.fn().mockImplementation((name: string) => {
@@ -724,12 +765,16 @@ describe('exportInventoryBundleToDefaultDirectory', () => {
         }
 
         if (name === 'fs') {
-          return {
+          return createAtomicFs({
             existsSync,
             mkdirSync,
             readFileSync,
             writeFileSync,
-          }
+            renameSync,
+            realpathSync: jest.fn((filePath: string) =>
+              filePath === localArchive ? externalArchive : filePath,
+            ),
+          })
         }
 
         return null
@@ -756,34 +801,30 @@ describe('exportInventoryBundleToDefaultDirectory', () => {
       { recursive: true },
     )
     expect(writeFileSync).toHaveBeenCalledWith(
-      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports/kancolle_kan_26-03-12.csv',
+      42,
       expect.stringMatching(/^\uFEFF/),
     )
     expect(writeFileSync).toHaveBeenCalledWith(
-      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports/kancolle_equips_2026-03-12.csv',
-      expect.stringMatching(/^\uFEFF/),
-    )
-    expect(writeFileSync).toHaveBeenCalledWith(
-      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports/kancolle_inventory_2026-03-12.json',
+      42,
       expect.stringContaining('"schema_version": "inventory_snapshot_v1"'),
+    )
+    expect(renameSync).toHaveBeenCalledWith(
+      expect.stringMatching(/kancolle_inventory_2026-03-12\.json\..+\.tmp$/),
+      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports/kancolle_inventory_2026-03-12.json',
     )
   })
 
   test('falls back to local-fallback when the archive export folder is unavailable', () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
-    const mkdirSync = jest.fn().mockImplementation((directory: string) => {
-      if (directory.includes('/archive/')) {
-        throw new Error('ENOENT: external archive is not mounted')
-      }
-    })
+    const mkdirSync = jest.fn()
     const writeFileSync = jest.fn()
     const existsSync = jest.fn().mockReturnValue(false)
     const readFileSync = jest.fn()
+    const renameSync = jest.fn()
 
     ;(globalThis as { remote?: unknown }).remote = {
       app: {
         getPath: jest.fn().mockImplementation((name: string) =>
-          name === 'home' ? '/Users/tester' : '/documents',
+          name === 'home' ? '/Users/tester' : '/Users/tester/Documents',
         ),
       },
       require: jest.fn().mockImplementation((name: string) => {
@@ -794,12 +835,14 @@ describe('exportInventoryBundleToDefaultDirectory', () => {
         }
 
         if (name === 'fs') {
-          return {
+          return createAtomicFs({
             existsSync,
             mkdirSync,
             readFileSync,
             writeFileSync,
-          }
+            renameSync,
+            realpathSync: jest.fn((filePath: string) => filePath),
+          })
         }
 
         return null
@@ -815,20 +858,16 @@ describe('exportInventoryBundleToDefaultDirectory', () => {
       '/Users/tester/Documents/Mira-Workspace/local-fallback/poi-inventory-exports',
     )
     expect(mkdirSync).toHaveBeenCalledWith(
-      '/Users/tester/Documents/Mira-Workspace/archive/poi-inventory-exports',
-      { recursive: true },
-    )
-    expect(mkdirSync).toHaveBeenCalledWith(
       '/Users/tester/Documents/Mira-Workspace/local-fallback/poi-inventory-exports',
       { recursive: true },
     )
     expect(writeFileSync).toHaveBeenCalledWith(
-      '/Users/tester/Documents/Mira-Workspace/local-fallback/poi-inventory-exports/kancolle_inventory_2026-03-12.json',
+      42,
       expect.stringContaining('"schema_version": "inventory_snapshot_v1"'),
     )
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[KC Inventory Export] Primary archive export failed; using local fallback.',
-      expect.any(Error),
+    expect(renameSync).toHaveBeenCalledWith(
+      expect.stringMatching(/kancolle_inventory_2026-03-12\.json\..+\.tmp$/),
+      '/Users/tester/Documents/Mira-Workspace/local-fallback/poi-inventory-exports/kancolle_inventory_2026-03-12.json',
     )
   })
 })
@@ -859,6 +898,7 @@ describe('exportShipCsvToFile', () => {
 
   test('writes UTF-8 BOM ship CSV via poi save dialog', async () => {
     const writeFileSync = jest.fn()
+    const renameSync = jest.fn()
     const showSaveDialog = jest.fn().mockResolvedValue({
       canceled: false,
       filePath: '/tmp/kancolle_kan_26-03-12.csv',
@@ -867,7 +907,9 @@ describe('exportShipCsvToFile', () => {
     ;(globalThis as { remote?: unknown }).remote = {
       app: { getPath: jest.fn().mockReturnValue('/documents') },
       dialog: { showSaveDialog },
-      require: jest.fn().mockReturnValue({ writeFileSync }),
+      require: jest
+        .fn()
+        .mockReturnValue(createAtomicFs({ writeFileSync, renameSync })),
     }
 
     const saved = await exportShipCsvToFile('header\nrow', new Date(2026, 2, 12))
@@ -878,8 +920,12 @@ describe('exportShipCsvToFile', () => {
       filters: [{ name: 'CSV', extensions: ['csv'] }],
     })
     expect(writeFileSync).toHaveBeenCalledWith(
-      '/tmp/kancolle_kan_26-03-12.csv',
+      42,
       '\uFEFFheader\nrow',
+    )
+    expect(renameSync).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/tmp\/kancolle_kan_26-03-12\.csv\..+\.tmp$/),
+      '/tmp/kancolle_kan_26-03-12.csv',
     )
   })
 })
@@ -910,6 +956,7 @@ describe('exportInventoryJsonToFile', () => {
 
   test('writes normalized JSON without a BOM via poi save dialog', async () => {
     const writeFileSync = jest.fn()
+    const renameSync = jest.fn()
     const showSaveDialog = jest.fn().mockResolvedValue({
       canceled: false,
       filePath: '/tmp/kancolle_inventory_2026-03-12.json',
@@ -918,7 +965,9 @@ describe('exportInventoryJsonToFile', () => {
     ;(globalThis as { remote?: unknown }).remote = {
       app: { getPath: jest.fn().mockReturnValue('/documents') },
       dialog: { showSaveDialog },
-      require: jest.fn().mockReturnValue({ writeFileSync }),
+      require: jest
+        .fn()
+        .mockReturnValue(createAtomicFs({ writeFileSync, renameSync })),
     }
 
     const saved = await exportInventoryJsonToFile(
@@ -932,8 +981,14 @@ describe('exportInventoryJsonToFile', () => {
       filters: [{ name: 'JSON', extensions: ['json'] }],
     })
     expect(writeFileSync).toHaveBeenCalledWith(
-      '/tmp/kancolle_inventory_2026-03-12.json',
+      42,
       '{\n  "schema_version": "inventory_snapshot_v1"\n}',
+    )
+    expect(renameSync).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^\/tmp\/kancolle_inventory_2026-03-12\.json\..+\.tmp$/,
+      ),
+      '/tmp/kancolle_inventory_2026-03-12.json',
     )
   })
 })
